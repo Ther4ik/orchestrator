@@ -26,9 +26,19 @@ demo.py              консольное демо с таймлайном
 Очередь сортируется по (приоритет, порядок поступления); при освобождении ресурса диспетчер сам запускает ожидающие.
 
 ## Основные эндпоинты
-POST /tasks · GET /tasks · GET /tasks/{id} · POST /tasks/{id}/cancel · POST /tasks/{id}/retry
-GET /queue · GET /system/load · GET /processes · GET /sources · GET /results · GET /audit
-POST /sources/{id}/update {mode: versioned|exclusive} · PUT /sources/{id}/status
+POST /tasks
+GET /tasks 
+GET /tasks/{id}
+POST /tasks/{id}/cancel 
+POST /tasks/{id}/retry
+GET /queue 
+GET /system/load 
+GET /processes 
+GET /sources 
+GET /results 
+GET /audit
+POST /sources/{id}/update {mode: versioned|exclusive} 
+PUT /sources/{id}/status
 
 ## Допущения / что дальше
 Хранение в памяти (при перезапуске всё сбрасывается) → SQLAlchemy/PostgreSQL; расписание (APScheduler/cron);

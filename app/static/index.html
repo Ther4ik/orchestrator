@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оркестратор процессов оценки рисков</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e9edf1;--panel:#fff;--ink:#12212e;--mute:#5d6e7c;--line:#d3dbe2;--brand:#0b4f6c;--run:#1565c0;--run-bg:#e3effc;--wait:#8a5a00;--wait-bg:#fff0cc;--ok:#14733f;--ok-bg:#dff3e6;--bad:#b3261e;--bad-bg:#fbe3e1;--neu-bg:#e8ecef}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 Onest,system-ui,sans-serif;color:var(--ink);background:var(--bg);display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+nav{background:var(--brand);color:#dcecf3;padding:20px 12px;position:sticky;top:0;height:100vh}
+nav h1{font-size:16px;margin:0 8px 20px;color:#fff;line-height:1.25}
+nav a{display:block;padding:9px 12px;border-radius:8px;color:inherit;text-decoration:none;margin-bottom:2px;font-weight:500}
+nav a:hover{background:#ffffff1f}nav a.on{background:#fff;color:var(--brand);font-weight:600}
+nav a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+main{padding:20px 28px 40px;min-width:0}
+header.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+header.bar h2{margin:0 auto 0 0;font-size:22px}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:500}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad);margin-right:6px}.dot.up{background:#1ea35b}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px;overflow-x:auto}
+.card h3{margin:0 0 12px;font-size:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi b{display:block;font-size:24px;font-weight:700}.kpi small{font-size:14px;color:var(--mute);font-weight:500}.kpi span{color:var(--mute);font-size:12.5px}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:500;font-size:12.5px;white-space:nowrap}
+tr.click{cursor:pointer}tr.click:hover{background:#f3f6f8}
+.chip{display:inline-block;padding:2px 9px;border-radius:6px;font-weight:600;font-size:12.5px;background:var(--neu-bg)}
+.chip.run{background:var(--run-bg);color:var(--run)}.chip.wait{background:var(--wait-bg);color:var(--wait)}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.prog{width:120px;height:8px;background:var(--neu-bg);border-radius:4px;overflow:hidden}.prog i{display:block;height:100%;background:var(--run);transition:width .6s}
+button{font:inherit;font-weight:600;border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:8px;padding:6px 14px;cursor:pointer}
+button.sec{background:#fff;color:var(--brand)}button.dng{background:#fff;color:var(--bad);border-color:var(--bad)}button:disabled{opacity:.5;cursor:default}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;align-items:end}
+label{display:grid;gap:4px;font-weight:500}label.chk{display:flex;gap:8px;align-items:center}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;min-width:0}
+.hint{color:var(--mute);font-size:12.5px;font-weight:400}
+.q{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.q:last-child{border:0}
+.q .n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--wait-bg);color:var(--wait);display:grid;place-items:center;font-weight:700}
+.why{margin:4px 0 0;padding:0;list-style:none}.why li{color:var(--mute)}.why b{color:var(--wait)}
+.verdict{margin-top:16px;padding:12px 14px;border-radius:10px;font-weight:500}
+.verdict.run{background:var(--run-bg)}.verdict.queue{background:var(--wait-bg)}.verdict.reject{background:var(--bad-bg)}
+.tl{list-style:none;margin:0;padding:0 0 0 16px;border-left:2px solid var(--line)}
+.tl li{position:relative;padding:0 0 10px 14px}.tl li:before{content:"";position:absolute;left:-23px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--brand);border:2px solid var(--bg)}
+.tl time{color:var(--mute);font-size:12.5px;margin-right:8px}
+#drawer{position:fixed;top:0;right:0;width:min(440px,100%);height:100vh;background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px #0002;padding:20px;overflow:auto;transform:translateX(105%);transition:transform .25s}
+#drawer.open{transform:none}
+dl{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;margin:0}dt{color:var(--mute)}dd{margin:0;word-break:break-word}
+.err{color:var(--bad);font-weight:500}.empty{color:var(--mute);padding:8px 0}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;z-index:9}
+@media(max-width:760px){body{grid-template-columns:1fr}nav{position:static;height:auto;display:flex;flex-wrap:wrap;gap:4px}nav h1{width:100%;margin-bottom:6px}main{padding:16px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<nav aria-label="Разделы">
+  <h1>Оркестратор оценки рисков</h1>
+  <a href="#dash">Мониторинг</a><a href="#run">Запуск расчёта</a><a href="#src">Источники данных</a><a href="#res">Результаты и журнал</a>
+</nav>
+<main>
+  <header class="bar"><h2 id="title"></h2><span class="pill" id="health"><i class="dot"></i>нет связи</span></header>
+  <div id="view"></div>
+</main>
+<aside id="drawer" aria-label="Карточка задачи"></aside>
+
+<script>
+// Адрес бэкенда: пусто = тот же origin (FastAPI раздаёт этот файл). Или откройте файл с ?api=http://localhost:8000
+const API = new URLSearchParams(location.search).get('api') || window.API_BASE || '';
+const POLL_MS = 1500;
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const arr = x => Array.isArray(x) ? x : (x && Object.values(x).find(Array.isArray)) || [];
+const tid = t => t.id ?? t.task_id;
+const PROCS = {}; const pname = t => PROCS[t.process_id] || t.process_id || '';
+const short = v => esc(typeof v === 'object' && v !== null ? JSON.stringify(v) : v);
+const fmt = v => v ? new Date(v).toLocaleTimeString('ru-RU') : '—';
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(API + path, {method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
+  if (!r.ok) throw new Error(r.status + ' ' + (await r.text()).slice(0, 200));
+  return r.json();
+}
+function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2600); }
+async function act(fn) { try { await fn(); tick(); } catch (e) { toast('Ошибка: ' + e.message); } }
+
+function chip(s) {
+  const v = String(s ?? '').toLowerCase();
+  const k = /ожид|очеред|обнов/.test(v) ? 'wait' : /выполняется/.test(v) ? 'run'
+    : /ошиб|отмен|отклон|неполн/.test(v) ? 'bad' : /успеш|готов/.test(v) ? 'ok' : '';
+  return `<span class="chip ${k}">${esc(s ?? '—')}</span>`;
+}
+function pct(p) { p = Number(p) || 0; return Math.round(p <= 1 ? p * 100 : p); }
+function reasons(list) {
+  return `<ul class="why">${arr(list).map(r => `<li><b>${esc(r.code)}</b> ${esc(r.text)}${r.blocked_by ? ` · блокирует задача <b>${esc(r.blocked_by)}</b>` : ''}</li>`).join('')}</ul>`;
+}
+function table(rows, cols) {
+  if (!rows.length) return '<div class="empty">Пока ничего нет.</div>';
+  return `<table><thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => cols.map(c => `<td>${c[1](r)}</td>`).join('')).map(x => `<tr>${x}</tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- Экраны ---------- */
+const screens = {
+  dash: {title: 'Мониторинг', async poll() {
+    const [load, tasks, queue] = await Promise.all([api('/system/load'), api('/tasks'), api('/queue')]);
+    const tl = arr(tasks);
+    const kpis = [['running', 'max_running', 'Выполняется'], ['load', 'max_load', 'Нагрузка (вес задач)'], ['heavy', 'max_heavy', 'Тяжёлые задачи']]
+      .map(([a, b, n]) => `<div class="kpi"><b>${esc(load[a])}<small> из ${esc(load[b])}</small></b><span>${n}</span></div>`).join('')
+      + `<div class="kpi"><b>${esc(load.queued)}</b><span>В очереди</span></div>`;
+    const q = arr(queue);
+    $('#view').innerHTML = `<div class="grid">${kpis}</div>
+    <div class="card"><h3>Очередь ожидания</h3>${q.length ? q.map((x, i) => `<div class="q"><div class="n">${i + 1}</div><div><b>${esc(pname(x))}</b> <span class="hint">задача ${esc(tid(x))}${x.business_date ? ' · дата ' + esc(x.business_date) : ''}</span><div>${esc(x.wait_reason || '')}</div>${reasons(x.reasons)}</div></div>`).join('') : '<div class="empty">Очередь пуста: все задачи выполняются или завершены.</div>'}</div>
+    <div class="card"><h3>Задачи</h3>${table(tl, [
+      ['ID', t => esc(tid(t))], ['Процесс', t => esc(pname(t))], ['Дата', t => esc(t.business_date)],
+      ['Статус', t => chip(t.status) + (Object.keys(t.newer_versions_available || {}).length ? ' <span class="chip wait" title="' + esc(JSON.stringify(t.newer_versions_available)) + '">источник обновился</span>' : '')],
+      ['Этап', t => esc(t.stage)], ['Прогресс', t => `<div class="prog"><i style="width:${pct(t.progress)}%"></i></div>`], ['Приоритет', t => esc(t.priority)],
+      ['', t => { const on = /ожидает|Выполняется/.test(t.status); return `<button class="dng" data-cancel="${esc(tid(t))}" ${on ? '' : 'disabled'}>Отменить</button> <button class="sec" data-retry="${esc(tid(t))}" ${on ? 'disabled' : ''}>Повторить</button>`; }]
+    ])}</div>`;
+  }},
+  run: {title: 'Запуск расчёта', async init() {
+    const procs = arr(await api('/processes'));
+    window._procs = procs;
+    $('#view').innerHTML = `<div class="card"><h3>Новый запуск</h3><form id="f">
+      <label>Процесс<select id="pid" required>${procs.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><span class="hint" id="pinfo"></span></label>
+      <label>Дата расчёта<input type="date" id="bd" required></label>
+      <label>Тип запуска<select id="trg"><option value="manual">Ручной</option><option value="scheduled">По регламенту</option></select></label>
+      <label>Кто запускает<input id="who" value="analyst-1" required></label>
+      <label>Имитировать сбой на этапе<select id="sim"><option value="">не имитировать</option>${['load', 'validate', 'calculate', 'write_staging', 'publish'].map(x => `<option>${x}</option>`).join('')}</select></label>
+      <button type="submit">Запустить</button></form><div id="verdict"></div></div>`;
+    $('#bd').value = new Date().toISOString().slice(0, 10);
+    const info = () => { const p = procs.find(x => x.id == $('#pid').value); if (p) $('#pinfo').textContent = `${p.department || ''} · вес ${p.weight ?? '?'} · группа ${p.group ?? '—'} · источники: ${arr(p.sources).join(', ') || '—'}${p.emergency ? ' · аварийный' : ''}`; };
+    $('#pid').onchange = info; info();
+    $('#f').onsubmit = async e => {
+      e.preventDefault();
+      try {
+        const r = await api('/tasks', 'POST', {process_id: $('#pid').value, business_date: $('#bd').value, trigger: $('#trg').value, requested_by: $('#who').value, simulate_failure_at: $('#sim').value || null});
+        const d = r.decision || r, v = d.verdict || 'run';
+        const label = {run: 'Запущено сразу', queue: 'Поставлено в очередь', reject: 'Отклонено'}[v] || v;
+        $('#verdict').innerHTML = `<div class="verdict ${esc(v)}">${label}${r.task ? ' · задача ' + esc(r.task.id) : ''}${reasons(d.reasons)}</div>`;
+      } catch (err) { $('#verdict').innerHTML = `<div class="verdict reject">${esc(err.message)}</div>`; }
+    };
+  }},
+  src: {title: 'Источники данных', async poll() {
+    const s = arr(await api('/sources'));
+    $('#view').innerHTML = `<div class="card"><h3>Источники</h3>${table(s, [
+      ['Источник', x => esc(x.name || x.id)], ['Статус', x => chip(x.status)], ['Версия', x => esc(x.version)],
+      ['Читают задачи', x => esc(arr(x.readers).join(', ') || '—')],
+      ['Запись', x => x.pending_exclusive_update ? '<span class="chip wait">ждёт, пока освободятся читатели</span>' : '—'],
+      ['Демо', x => `<button class="sec" data-upd="${esc(x.id)}" data-mode="versioned">Новая версия</button> <button class="sec" data-upd="${esc(x.id)}" data-mode="exclusive">Эксклюзивно</button>
+        <select data-st="${esc(x.id)}" aria-label="Статус"><option value="">Статус…</option>${['Готов', 'Обновляется', 'Неполные данные', 'Ошибка'].map(o => `<option>${o}</option>`).join('')}</select>`]
+    ])}</div><p class="hint">«Новая версия» — запущенные расчёты дочитают старые данные. «Эксклюзивно» — обновление ждёт, пока читатели закончат.</p>`;
+  }},
+  res: {title: 'Результаты и журнал', async poll() {
+    const [res, aud] = await Promise.all([api('/results'), api('/audit?limit=200')]);
+    const rr = Array.isArray(res) ? res : Object.entries(res || {}).map(([k, v]) => ({id: k, ...(typeof v === 'object' ? v : {value: v})}));
+    const cols = rr.length ? Object.keys(rr[0]).map(k => [esc(k), r => short(r[k])]) : [];
+    const ev = arr(aud);
+    $('#view').innerHTML = `<div class="card"><h3>Готовые результаты</h3>${table(rr, cols)}</div>
+    <div class="card"><h3>Журнал операций (порядок выполнения)</h3>${ev.length ? `<ul class="tl">${ev.slice().reverse().map(e => `<li><time>${fmt(e.ts || e.time || e.timestamp)}</time>${esc(e.event || e.action || e.type || '')} ${esc(e.message || e.text || '')}<div class="hint">${Object.entries(e).filter(([k]) => !/^(ts|time|timestamp|event|action|type|message|text)$/.test(k)).map(([k, v]) => esc(k) + ': ' + short(v)).join(' · ')}</div></li>`).join('')}</ul>` : '<div class="empty">Журнал пуст. Запустите расчёт.</div>'}</div>`;
+  }}
+};
+
+/* ---------- Карточка задачи ---------- */
+let openTask = null;
+async function showTask(id) {
+  openTask = id; $('#drawer').classList.add('open');
+  try {
+    const t = await api('/tasks/' + id);
+    const f = [['Статус', chip(t.status)], ['Этап', esc(t.stage)], ['Прогресс', pct(t.progress) + '%'], ['Попытка', esc(t.attempt)], ['Повтор задачи', esc(t.retry_of ?? '—')],
+      ['Версии источников на старте', short(t.source_versions)], ['Staging', short(t.staging)], ['Ошибка', t.error ? `<span class="err">${esc(t.error)}</span>` : '—'],
+      ['Создана', fmt(t.created_at)], ['Старт', fmt(t.started_at)], ['Завершена', fmt(t.finished_at)]];
+    $('#drawer').innerHTML = `<button class="sec" id="x">Закрыть</button><h3>Задача ${esc(id)}</h3><p>${esc(pname(t))} ${t.business_date ? '· ' + esc(t.business_date) : ''}</p><dl>${f.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
+    $('#x').onclick = () => { openTask = null; $('#drawer').classList.remove('open'); };
+  } catch (e) { $('#drawer').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
+/* ---------- Роутинг и polling ---------- */
+let cur = null, inited = false;
+async function tick() {
+  try {
+    const h = await api('/health');
+    if (!Object.keys(PROCS).length) arr(await api('/processes')).forEach(p => PROCS[p.id] = p.name);
+    $('#health').innerHTML = `<i class="dot up"></i>сервер: ${esc(h.ok === false ? 'ошибка' : 'на связи')}`;
+    const s = screens[cur];
+    if (!inited && s.init) { await s.init(); inited = true; } else if (s.poll) await s.poll();
+    if (openTask) showTask(openTask);
+  } catch (e) {
+    $('#health').innerHTML = '<i class="dot"></i>нет связи с бэкендом';
+    if (!screens[cur].init) $('#view').innerHTML = `<div class="card err">Не удаётся получить данные: ${esc(e.message)}. Проверьте, что бэкенд запущен${API ? ' на ' + esc(API) : ''}.</div>`;
+  }
+}
+function route() {
+  const k = (location.hash || '#dash').slice(1);
+  cur = screens[k] ? k : 'dash'; inited = false;
+  $('#title').textContent = screens[cur].title;
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.hash === '#' + cur));
+  tick();
+}
+addEventListener('hashchange', route);
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cancel],[data-retry],[data-upd]'), row = e.target.closest('tr');
+  if (b) {
+    const d = b.dataset;
+    if (d.cancel) act(() => api(`/tasks/${d.cancel}/cancel`, 'POST'));
+    if (d.retry) act(() => api(`/tasks/${d.retry}/retry`, 'POST'));
+    if (d.upd) act(() => api(`/sources/${d.upd}/update`, 'POST', {mode: d.mode}));
+  } else if (row && cur === 'dash' && row.cells.length > 4) showTask(row.cells[0].textContent);
+});
+document.addEventListener('change', e => {
+  const s = e.target.closest('[data-st]');
+  if (s && s.value) act(() => api(`/sources/${s.dataset.st}/status`, 'PUT', {status: s.value}));
+});
+setInterval(() => { if (cur !== 'run' && !document.hidden) tick(); }, POLL_MS);
+route();
+</script>
+</body>
+</html>

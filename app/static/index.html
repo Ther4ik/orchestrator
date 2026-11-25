@@ -83,6 +83,12 @@ async function api(path, method = 'GET', body) {
   if (!r.ok) throw new Error(r.status + ' ' + (await r.text()).slice(0, 200));
   return r.json();
 }
+let lastHtml = '';
+function render(html) {                       // не перерисовываем зря: иначе polling закрывает открытый <select> и сбрасывает фокус
+  const a = document.activeElement;
+  if (html === lastHtml || (a && a.closest('#view') && /^(SELECT|INPUT)$/.test(a.tagName))) return;
+  lastHtml = html; $('#view').innerHTML = html;
+}
 function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2600); }
 async function act(fn) { try { await fn(); tick(); } catch (e) { toast('Ошибка: ' + e.message); } }
 
@@ -110,14 +116,14 @@ const screens = {
       .map(([a, b, n]) => `<div class="kpi"><b>${esc(load[a])}<small> из ${esc(load[b])}</small></b><span>${n}</span></div>`).join('')
       + `<div class="kpi"><b>${esc(load.queued)}</b><span>В очереди</span></div>`;
     const q = arr(queue);
-    $('#view').innerHTML = `<div class="grid">${kpis}</div>
+    render(`<div class="grid">${kpis}</div>
     <div class="card"><h3>Очередь ожидания</h3>${q.length ? q.map((x, i) => `<div class="q"><div class="n">${i + 1}</div><div><b>${esc(pname(x))}</b> <span class="hint">задача ${esc(tid(x))}${x.business_date ? ' · дата ' + esc(x.business_date) : ''}</span><div>${esc(x.wait_reason || '')}</div>${reasons(x.reasons)}</div></div>`).join('') : '<div class="empty">Очередь пуста: все задачи выполняются или завершены.</div>'}</div>
     <div class="card"><h3>Задачи</h3>${table(tl, [
       ['ID', t => esc(tid(t))], ['Процесс', t => esc(pname(t))], ['Дата', t => esc(t.business_date)],
       ['Статус', t => chip(t.status) + (Object.keys(t.newer_versions_available || {}).length ? ' <span class="chip wait" title="' + esc(JSON.stringify(t.newer_versions_available)) + '">источник обновился</span>' : '')],
       ['Этап', t => esc(t.stage)], ['Прогресс', t => `<div class="prog"><i style="width:${pct(t.progress)}%"></i></div>`], ['Приоритет', t => esc(t.priority)],
       ['', t => { const on = /ожидает|Выполняется/.test(t.status); return `<button class="dng" data-cancel="${esc(tid(t))}" ${on ? '' : 'disabled'}>Отменить</button> <button class="sec" data-retry="${esc(tid(t))}" ${on ? 'disabled' : ''}>Повторить</button>`; }]
-    ])}</div>`;
+    ])}</div>`);
   }},
   run: {title: 'Запуск расчёта', async init() {
     const procs = arr(await api('/processes'));
@@ -129,7 +135,7 @@ const screens = {
       <label>Кто запускает<input id="who" value="analyst-1" required></label>
       <label>Имитировать сбой на этапе<select id="sim"><option value="">не имитировать</option>${['load', 'validate', 'calculate', 'write_staging', 'publish'].map(x => `<option>${x}</option>`).join('')}</select></label>
       <button type="submit">Запустить</button></form><div id="verdict"></div></div>`;
-    $('#bd').value = new Date().toISOString().slice(0, 10);
+    const n = new Date(); $('#bd').value = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
     const info = () => { const p = procs.find(x => x.id == $('#pid').value); if (p) $('#pinfo').textContent = `${p.department || ''} · вес ${p.weight ?? '?'} · группа ${p.group ?? '—'} · источники: ${arr(p.sources).join(', ') || '—'}${p.emergency ? ' · аварийный' : ''}`; };
     $('#pid').onchange = info; info();
     $('#f').onsubmit = async e => {
@@ -144,21 +150,21 @@ const screens = {
   }},
   src: {title: 'Источники данных', async poll() {
     const s = arr(await api('/sources'));
-    $('#view').innerHTML = `<div class="card"><h3>Источники</h3>${table(s, [
+    render(`<div class="card"><h3>Источники</h3>${table(s, [
       ['Источник', x => esc(x.name || x.id)], ['Статус', x => chip(x.status)], ['Версия', x => esc(x.version)],
       ['Читают задачи', x => esc(arr(x.readers).join(', ') || '—')],
       ['Запись', x => x.pending_exclusive_update ? '<span class="chip wait">ждёт, пока освободятся читатели</span>' : '—'],
       ['Демо', x => `<button class="sec" data-upd="${esc(x.id)}" data-mode="versioned">Новая версия</button> <button class="sec" data-upd="${esc(x.id)}" data-mode="exclusive">Эксклюзивно</button>
         <select data-st="${esc(x.id)}" aria-label="Статус"><option value="">Статус…</option>${['Готов', 'Обновляется', 'Неполные данные', 'Ошибка'].map(o => `<option>${o}</option>`).join('')}</select>`]
-    ])}</div><p class="hint">«Новая версия» — запущенные расчёты дочитают старые данные. «Эксклюзивно» — обновление ждёт, пока читатели закончат.</p>`;
+    ])}</div><p class="hint">«Новая версия» — запущенные расчёты дочитают старые данные. «Эксклюзивно» — обновление ждёт, пока читатели закончат.</p>`);
   }},
   res: {title: 'Результаты и журнал', async poll() {
     const [res, aud] = await Promise.all([api('/results'), api('/audit?limit=200')]);
     const rr = Array.isArray(res) ? res : Object.entries(res || {}).map(([k, v]) => ({id: k, ...(typeof v === 'object' ? v : {value: v})}));
     const cols = rr.length ? Object.keys(rr[0]).map(k => [esc(k), r => short(r[k])]) : [];
     const ev = arr(aud);
-    $('#view').innerHTML = `<div class="card"><h3>Готовые результаты</h3>${table(rr, cols)}</div>
-    <div class="card"><h3>Журнал операций (порядок выполнения)</h3>${ev.length ? `<ul class="tl">${ev.slice().reverse().map(e => `<li><time>${fmt(e.ts || e.time || e.timestamp)}</time>${esc(e.event || e.action || e.type || '')} ${esc(e.message || e.text || '')}<div class="hint">${Object.entries(e).filter(([k]) => !/^(ts|time|timestamp|event|action|type|message|text)$/.test(k)).map(([k, v]) => esc(k) + ': ' + short(v)).join(' · ')}</div></li>`).join('')}</ul>` : '<div class="empty">Журнал пуст. Запустите расчёт.</div>'}</div>`;
+    render(`<div class="card"><h3>Готовые результаты</h3>${table(rr, cols)}</div>
+    <div class="card"><h3>Журнал операций (порядок выполнения)</h3>${ev.length ? `<ul class="tl">${ev.slice().reverse().map(e => `<li><time>${fmt(e.ts || e.time || e.timestamp)}</time>${esc(e.event || e.action || e.type || '')} ${esc(e.message || e.text || '')}<div class="hint">${Object.entries(e).filter(([k]) => !/^(ts|time|timestamp|event|action|type|message|text)$/.test(k)).map(([k, v]) => esc(k) + ': ' + short(v)).join(' · ')}</div></li>`).join('')}</ul>` : '<div class="empty">Журнал пуст. Запустите расчёт.</div>'}</div>`);
   }}
 };
 
@@ -193,7 +199,7 @@ async function tick() {
 }
 function route() {
   const k = (location.hash || '#dash').slice(1);
-  cur = screens[k] ? k : 'dash'; inited = false;
+  cur = screens[k] ? k : 'dash'; inited = false; lastHtml = '';
   $('#title').textContent = screens[cur].title;
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.hash === '#' + cur));
   tick();

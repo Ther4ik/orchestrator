@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Callable, Optional
 
-from .catalog import PROCESSES, SOURCES, Weight
+from .catalog import PROCESSES, SOURCES, STAGES, Weight
 from .models import (ACTIVE, Decision, Priority, Reason, Source, SourceStatus, Status, Task, Trigger,
                      Verdict, now)
 
@@ -50,6 +50,8 @@ class Orchestrator:
         """Принять запрос на запуск. Возвращает (task, decision)."""
         if process_id not in PROCESSES:
             raise ValueError(f"Неизвестный процесс {process_id}")
+        if simulate_failure_at is not None and simulate_failure_at not in STAGES:
+            raise ValueError(f"simulate_failure_at: один из {list(STAGES)}")
         proc = PROCESSES[process_id]
         with self._lock:
             n = next(self._seq)
@@ -258,7 +260,12 @@ class Orchestrator:
         task.status, task.reasons = Status.RUNNING, []
         task.started_at, task.progress = now(), 0.0
         self._log("started", task, f"версии источников: {task.snapshot}")
-        self.on_start(task)
+        try:
+            self.on_start(task)
+        except Exception as e:   # исполнитель не смог принять задачу -> не держим ресурсы впустую
+            self._finish(task, Status.FAILED, error=f"Не удалось запустить исполнителя: {e}")
+            self._release(task)
+            self._discard_staging(task)
 
     def _release(self, task: Task):
         for src in self.sources.values():

@@ -17,9 +17,9 @@ async def main():
     orch.submit("MR-01", D, Trigger.SCHEDULED, "scheduler")            # К-04: VaR
     await asyncio.sleep(0.3)
     orch.update_source("SRC-006", "versioned")                         # К-04: новые котировки во время расчёта
-    orch.submit("LR-02", D, Trigger.SCHEDULED, "scheduler", simulate_failure_at="calculate")  # К-06: сбой
+    orch.submit("LR-03", D, Trigger.SCHEDULED, "scheduler", simulate_failure_at="calculate")  # К-06: сбой
     await asyncio.sleep(3)
-    failed = next(t for t in orch.tasks.values() if t.process_id == "LR-02")
+    failed = next(t for t in orch.tasks.values() if t.process_id == "LR-03")
     orch.retry(failed.id)
     await asyncio.sleep(2)
 
@@ -28,4 +28,5 @@ async def main():
         print(f"{e['ts'][11:23]:<13}{e['event']:<18}{(e['task_id'] or '-'):<8}{(e['process_id'] or '-'):<8}{e['text']}")
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

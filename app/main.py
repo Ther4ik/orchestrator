@@ -3,15 +3,15 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .catalog import PROCESSES
+from .catalog import PROCESSES, STAGES
 from .models import SourceStatus, Status, Trigger
 from .orchestrator import Orchestrator
-from .runner import STAGES, SimulatedRunner
+from .runner import SimulatedRunner
 
 STEP_SECONDS = 2.0   # длительность одного этапа имитации
 # Эндпоинты объявлены async: ядро не блокирует (всё в памяти) и должно работать в потоке event loop,
@@ -28,7 +28,7 @@ class RunRequest(BaseModel):
     process_id: str
     business_date: date
     trigger: Trigger = Trigger.MANUAL
-    requested_by: str = "user"
+    requested_by: str = Field("user", min_length=1, max_length=64)
     simulate_failure_at: Optional[str] = None   # одно из: load, validate, calculate, write_staging, publish
 
 
@@ -66,12 +66,11 @@ async def sources():
 @app.post("/tasks", status_code=201)
 async def create_task(req: RunRequest):
     if req.simulate_failure_at and req.simulate_failure_at not in STAGES:
-        raise HTTPException(422, f"simulate_failure_at: один из {STAGES}")
-    try:
-        task, decision = orch.submit(req.process_id, req.business_date, req.trigger, req.requested_by,
-                                     req.simulate_failure_at)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(422, f"simulate_failure_at: один из {list(STAGES)}")
+    if req.process_id not in PROCESSES:
+        raise HTTPException(404, f"Неизвестный процесс {req.process_id}")
+    task, decision = orch.submit(req.process_id, req.business_date, req.trigger, req.requested_by,
+                                 req.simulate_failure_at)
     return {"task": _task(task), "decision": decision.to_dict()}
 
 
@@ -128,7 +127,7 @@ async def results():
 
 
 @app.get("/audit")
-async def audit(limit: int = 200):
+async def audit(limit: int = Query(200, ge=1, le=1000)):
     return orch.audit[-limit:]
 
 

@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .catalog import PROCESSES, STAGES
+from .catalog import DEMO_SOURCES, PROCESSES, STAGES
 from .models import SourceStatus, Status, Trigger
 from .orchestrator import Orchestrator
 from .runner import SimulatedRunner
@@ -59,7 +59,12 @@ async def processes():
 
 @app.get("/sources")
 async def sources():
-    return [s.to_dict() for s in orch.sources.values()]
+    def item(s):
+        d = s.to_dict()
+        demo = DEMO_SOURCES.get(s.id)       # (конфликт, подсказка) или None
+        d["demo"] = {"conflict": demo[0], "hint": demo[1]} if demo else None
+        return d
+    return [item(s) for s in orch.sources.values()]
 
 
 # ---- задачи

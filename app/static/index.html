@@ -43,6 +43,9 @@ input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-r
 .why{margin:4px 0 0;padding:0;list-style:none}.why li{color:var(--mute)}.why b{color:var(--wait)}
 .verdict{margin-top:16px;padding:12px 14px;border-radius:10px;font-weight:500}
 .verdict.run{background:var(--run-bg)}.verdict.queue{background:var(--wait-bg)}.verdict.reject{background:var(--bad-bg)}
+tr.demo{background:#fff8e1}tr.demo td:first-child{box-shadow:inset 4px 0 0 #f2b705}
+tr.dim td{opacity:.55}tr.dim:hover td{opacity:1}
+.demohint{display:block;color:var(--mute);font-size:12.5px;font-weight:400;margin-top:2px;max-width:330px}
 .tl{list-style:none;margin:0;padding:0 0 0 16px;border-left:2px solid var(--line)}
 .tl li{position:relative;padding:0 0 10px 14px}.tl li:before{content:"";position:absolute;left:-23px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--brand);border:2px solid var(--bg)}
 .tl time{color:var(--mute);font-size:12.5px;margin-right:8px}
@@ -102,9 +105,9 @@ function pct(p) { p = Number(p) || 0; return Math.round(p <= 1 ? p * 100 : p); }
 function reasons(list) {
   return `<ul class="why">${arr(list).map(r => `<li><b>${esc(r.code)}</b> ${esc(r.text)}${r.blocked_by ? ` · блокирует задача <b>${esc(r.blocked_by)}</b>` : ''}</li>`).join('')}</ul>`;
 }
-function table(rows, cols) {
+function table(rows, cols, rowClass) {
   if (!rows.length) return '<div class="empty">Пока ничего нет.</div>';
-  return `<table><thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => cols.map(c => `<td>${c[1](r)}</td>`).join('')).map(x => `<tr>${x}</tr>`).join('')}</tbody></table>`;
+  return `<table><thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr${rowClass && rowClass(r) ? ` class="${rowClass(r)}"` : ''}>${cols.map(c => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 }
 
 /* ---------- Экраны ---------- */
@@ -151,12 +154,12 @@ const screens = {
   src: {title: 'Источники данных', async poll() {
     const s = arr(await api('/sources'));
     render(`<div class="card"><h3>Источники</h3>${table(s, [
-      ['Источник', x => esc(x.name || x.id)], ['Статус', x => chip(x.status)], ['Версия', x => esc(x.version)],
+      ['Источник', x => `<b>${esc(x.name || x.id)}</b> <span class="hint">${esc(x.id)}</span>` + (x.demo ? ` <span class="chip wait">${esc(x.demo.conflict)}</span><span class="demohint">${esc(x.demo.hint)}</span>` : '')], ['Статус', x => chip(x.status)], ['Версия', x => esc(x.version)],
       ['Читают задачи', x => esc(arr(x.readers).join(', ') || '—')],
       ['Запись', x => x.pending_exclusive_update ? '<span class="chip wait">ждёт, пока освободятся читатели</span>' : '—'],
       ['Демо', x => `<button class="sec" data-upd="${esc(x.id)}" data-mode="versioned">Новая версия</button> <button class="sec" data-upd="${esc(x.id)}" data-mode="exclusive">Эксклюзивно</button>
         <select data-st="${esc(x.id)}" aria-label="Статус"><option value="">Статус…</option>${['Готов', 'Обновляется', 'Неполные данные', 'Ошибка'].map(o => `<option>${o}</option>`).join('')}</select>`]
-    ])}</div><p class="hint">«Новая версия» — запущенные расчёты дочитают старые данные. «Эксклюзивно» — обновление ждёт, пока читатели закончат.</p>`);
+    ], x => s.some(y => y.demo) ? (x.demo ? 'demo' : 'dim') : '')}</div><p class="hint">Подсвечены источники, на которых построены демо-сценарии (К-02, К-04, К-05); остальные приглушены. «Новая версия» — запущенные расчёты дочитают старые данные. «Эксклюзивно» — обновление ждёт, пока читатели закончат.</p>`);
   }},
   res: {title: 'Результаты и журнал', async poll() {
     const [res, aud] = await Promise.all([api('/results'), api('/audit?limit=200')]);

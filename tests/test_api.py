@@ -35,6 +35,10 @@ class Api(unittest.TestCase):
         ids = {x["id"] for x in self.client.get("/processes").json()}
         self.assertEqual(ids, {"CR-01", "CR-07", "MR-01", "LR-03", "MR-08"})
 
+    def test_sources_mark_only_demo_scenario_sources(self):
+        marked = {x["id"]: x["demo"]["conflict"] for x in self.client.get("/sources").json() if x["demo"]}
+        self.assertEqual(marked, {"SRC-001": "К-02", "SRC-006": "К-04", "SRC-008": "К-05"})
+
     def test_process_outside_mvp_set_is_404(self):
         self.assertEqual(self.post(process_id="CR-06").status_code, 404)
 

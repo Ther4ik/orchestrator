@@ -13,7 +13,7 @@ from .models import SourceStatus, Status, Trigger
 from .orchestrator import Orchestrator
 from .runner import SimulatedRunner
 
-STEP_SECONDS = 2.0   # длительность одного этапа имитации
+STEP_SECONDS = 5.0   # длительность одного этапа имитации
 # Эндпоинты объявлены async: ядро не блокирует (всё в памяти) и должно работать в потоке event loop,
 # где живёт исполнитель (asyncio.create_task).
 
